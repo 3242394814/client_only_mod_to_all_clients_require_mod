@@ -26,7 +26,7 @@ author = "冰冰羊"
 description = [[
 
 ]]
-version = "0.2"
+version = "0.2.4"
 dst_compatible = true
 forge_compatible = true
 gorge_compatible = true

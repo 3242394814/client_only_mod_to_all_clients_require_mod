@@ -18,7 +18,9 @@ if not TheNet:GetIsClient() then
         local server_mods = OldGetEnabledServerModNames(self,...)
             if IsNotConsole() then
                 for k,v in pairs(clientmods) do
-                    table.insert(server_mods, k)
+                    if not table.contains(server_mods, k) then
+                        table.insert(server_mods, k)
+                    end
                 end
             end
         return server_mods
@@ -56,7 +58,7 @@ for k,_ in pairs(clientmods) do
                 DEBUG_print("[客户端MOD转为服务器MOD] 正在使用方法一设置客户端模组设置", k, k1, "=", v1)
             end
         else -- MOD已下载的情况
-            local mod_options = known_mod.modinfo.configuration_options
+            local mod_options = known_mod.modinfo.configuration_options or {}
             for _,k1 in pairs(mod_options) do
                 for k2,v2 in pairs(clientmods[k].config) do
                     if k1.name == k2 then
@@ -77,43 +79,13 @@ for k,_ in pairs(clientmods) do
         end
     end
 end
---总流程大概是：client_only_mod 转换为 all_clients_require_mod →服务器设置好客户端MOD配置→客户端进服先使用服务器提供的客户端MOD配置→客户端再使用自己生成的客户端MOD配置
 
-
--- 笔记部分，Table表的格式大概长这样
---[[
-mod_options = {
-    {
-        name = "custom_name_1",
-        label = "",
-        default = "",
-        options = {
-            {
-                data = "",
-                description = "",
-            },
-        },
-        saved = "value1"
-        saved_client = ""
-    },
-    {
-        name = "custom_name_2",
-        label = "",
-        default = "",
-        options = {
-            {
-                data = "",
-                description = "",
-            },
-        },
-        saved = "value2"
-        saved_client = ""
-    },
-}
-
-temp_options = {
-    custom_name_1 = "value1",
-    custom_name_2 = "value2",
-    custom_name_3 = "value3",
-}
-]]
+-- 修复gamepostinit不加载的问题
+if TheNet:GetIsClient() then
+    DEBUG_print("[客户端MOD转为服务器MOD] HOOK KnownModIndex.IsModEnabled成功")
+    local _ModIndex_IsModEnabled = KnownModIndex.IsModEnabled
+    KnownModIndex.IsModEnabled = function(self, modname, ...)
+        local mod_enabled = _ModIndex_IsModEnabled(self, modname, ...)
+        return mod_enabled or clientmods[modname]
+    end
+end

@@ -60,21 +60,26 @@ local function fn(self)
 
     print("[客户端MOD转为服务器MOD] 自动更新数据...")
     for k,_ in pairs(mod_list) do
-        print("要转换为服务器的客户端MOD：",k, "版本号：",KnownModIndex:InitializeModInfo(k).version)
-
         local known_mod = KnownModIndex.savedata.known_mods[k]
-        local temp_config = {}
-        local mod_options = known_mod.modinfo.configuration_options
-        for k,v in pairs(mod_options) do
-            if type(v) == "table" then
-                temp_config[v.name] = mod_options[k].saved or v.default
-            end
-        end
+        if known_mod then
+            local version = KnownModIndex:InitializeModInfo(k).version
+            version = TrimString(version or "")
+            version = string.lower(version)
 
-        mod_list[k] = {
-                version = KnownModIndex:InitializeModInfo(k).version, -- "workshop-123456" = 版本号
-                config = temp_config
-        }
+            print("要转换为服务器的客户端MOD：", k, "版本号：", version)
+            local temp_config = {}
+            local mod_options = known_mod.modinfo and known_mod.modinfo.configuration_options or {}
+            for k,v in pairs(mod_options) do
+                if type(v) == "table" then
+                    temp_config[v.name] = mod_options[k].saved or v.default
+                end
+            end
+
+            mod_list[k] = {
+                    version = version, -- "workshop-123456" = 版本号
+                    config = temp_config
+            }
+        end
     end
 
     local _ApplyDataToWidget = self.mods_tab.mods_scroll_list.update_fn
@@ -110,15 +115,19 @@ local function fn(self)
                     else
                         local known_mod = KnownModIndex.savedata.known_mods[opt.parent.data.mod.modname]
                         local temp_config = {}
-                        local mod_options = known_mod.modinfo.configuration_options
+                        local mod_options = known_mod.modinfo.configuration_options or {}
                         for k,v in pairs(mod_options) do
                             if type(v) == "table" then
                                 temp_config[v.name] = mod_options[k].saved or v.default
                             end
                         end
 
+                        local version = KnownModIndex:InitializeModInfo(opt.parent.data.mod.modname).version
+                        version = TrimString(version or "")
+                        version = string.lower(version)
+
                         mod_list[opt.parent.data.mod.modname] = {
-                             version = KnownModIndex:InitializeModInfo(opt.parent.data.mod.modname).version, -- "workshop-123456" = 版本号
+                             version = version, -- "workshop-123456" = 版本号
                              config = temp_config
                         }
                     end
@@ -130,15 +139,19 @@ local function fn(self)
                     for k,v in pairs(mod_list) do
                         local known_mod = KnownModIndex.savedata.known_mods[k]
                         local temp_config = {}
-                        local mod_options = known_mod.modinfo.configuration_options
+                        local mod_options = known_mod.modinfo.configuration_options or {}
                         for k1,v1 in pairs(mod_options) do
                             if type(v1) == "table" then
                                 temp_config[v1.name] = mod_options[k1].saved or v1.default
                             end
                         end
 
+                        local version = KnownModIndex:InitializeModInfo(k).version
+                        version = TrimString(version or "")
+                        version = string.lower(version)
+
                         mod_list[k] = {
-                             version = KnownModIndex:InitializeModInfo(k).version, -- "workshop-123456" = 版本号
+                             version = version, -- "workshop-123456" = 版本号
                              config = temp_config
                         }
                     end
