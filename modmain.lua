@@ -4,14 +4,10 @@ GLOBAL.setmetatable(env, {
     end
 })
 
-local function DEBUG_print(...)
-    if GetModConfigData("DEBUG_print") then
-        print(...)
-    end
-end
-
+local DEBUG_print = GetModConfigData("DEBUG_print", true) and print or function(...) end
 local clientmods = GetModConfigData("client_mods_list") or {}
 
+-- 服务器：将转换的客户端模组添加到“服务器模组列表”中，这样客户端进服时就会自动下载那些客户端模组
 if not TheNet:GetIsClient() then
     local OldGetEnabledServerModNames = ModManager.GetEnabledServerModNames
     ModManager.GetEnabledServerModNames=function(self,...)
@@ -27,10 +23,94 @@ if not TheNet:GetIsClient() then
     end
 end
 
+local ServerAreClientModsDisabled = false -- 服务器是否开启“友好的禁用客户端模组”
+local need_kleiregistermods = {} -- 需要注册的客户端模组
+
+-- 检测服务器是否开启“友好的禁用客户端模组”
+local server_listing = TheNet:GetServerListing()
+if server_listing and server_listing.client_mods_disabled then
+    ServerAreClientModsDisabled = true
+end
+
+-- Sort the mods by priority, so that "library" mods can load first
+local function sanitizepriority(priority)
+    local prioritytype = type(priority)
+    if prioritytype == "string" then
+        return tonumber(priority) or 0
+    elseif prioritytype == "number" then
+        return priority
+    end
+    return 0
+end
+local function modPrioritySort(a, b)
+    -- NOTES(JBK): Mac OS changed locale sorting so we have to do this using stringidsorter to avoid locale issues.
+    -- I am also changing how it is sorted if the modinfo is not present to use the mod's modname instead.
+    -- All priority fields are going to be converted to a number.
+    if a.modinfo and b.modinfo then
+        local apriority = sanitizepriority(a.modinfo.priority)
+        local bpriority = sanitizepriority(b.modinfo.priority)
+        if apriority == bpriority then
+            local aname = a.modinfo.name
+            if type(aname) ~= "string" then
+                aname = a.modname
+            end
+            local bname = b.modinfo.name
+            if type(bname) ~= "string" then
+                bname = b.modname
+            end
+            return stringidsorter(aname, bname)
+        end
+        return apriority > bpriority
+    end
+    return stringidsorter(a.modname, b.modname)
+end
+local function insert_sorted(tbl, value)
+    for i = 1, #tbl do
+        if modPrioritySort(value, tbl[i]) then
+            table.insert(tbl, i, value)
+            return
+        end
+    end
+    table.insert(tbl, value)
+end
+
+local function registerclientmods(modname) -- 手动初始化客户端模组并添加到模组加载列表中
+    if not table.contains(ModManager.modnames, modname) and ModManager.worldgen == false or (ModManager.worldgen == true and KnownModIndex:IsModCompatibleWithMode(modname)) then
+        DEBUG_print("[客户端MOD转为服务器MOD] 加载客户端模组：", modname)
+        table.insert(ModManager.modnames, modname)
+
+        if ModManager.worldgen == false then
+            -- Make sure we load the config data before the mod (but not during worldgen)
+            if TheNet:GetIsServer() and not TheNet:IsDedicated() then
+                local options = KnownModIndex:LoadModConfigurationOptions(modname, false)
+
+                KnownModIndex:SetTempModConfigData({[modname] = options})
+
+                KnownModIndex:LoadModConfigurationOptions(modname, true)
+            else
+                KnownModIndex:LoadModConfigurationOptions(modname, not TheNet:GetIsServer())
+            end
+        end
+
+        local initenv = KnownModIndex:GetModInfo(modname)
+        local env = CreateEnvironment(modname,  ModManager.worldgen)
+        env.modinfo = initenv
+
+        -- table.insert( ModManager.mods, env ) -- 在此处将模组添加到饥荒需要加载的模组列表中
+        insert_sorted(ModManager.mods, env) -- 根据模组加载优先级插入到正确位置
+        table.insert( need_kleiregistermods, env )
+        local loadmsg = "Loading mod: "..ModInfoname(modname).." Version:"..env.modinfo.version
+        if initenv.modinfo_message and initenv.modinfo_message ~= "" then
+            loadmsg = loadmsg .. " ("..initenv.modinfo_message..")"
+        end
+        print(loadmsg)
+    end
+end
+
 -- 额外处理
 for k,_ in pairs(clientmods) do
     if not KnownModIndex.savedata.known_mods[k] then
-        DEBUG_print("[客户端MOD转为服务器MOD] " .. k .. "未下载，使用方法一转换MOD类型")
+        DEBUG_print("[客户端MOD转为服务器MOD] 使用方法一转换MOD类型", k)
         KnownModIndex.savedata.known_mods[k] = {}
         local known_mod = KnownModIndex.savedata.known_mods[k]
         known_mod.modinfo = {
@@ -39,9 +119,10 @@ for k,_ in pairs(clientmods) do
             version = clientmods[k].version,
         }
     elseif KnownModIndex.savedata.known_mods[k] and KnownModIndex.savedata.known_mods[k].modinfo then
-        DEBUG_print("[客户端MOD转为服务器MOD] MOD已下载，使用方法二转换MOD类型", k," = ",clientmods[k].version)
+        DEBUG_print("[客户端MOD转为服务器MOD] 使用方法二转换MOD类型", k," = ",clientmods[k].version)
         KnownModIndex.savedata.known_mods[k].modinfo.all_clients_require_mod = true
         KnownModIndex.savedata.known_mods[k].modinfo.client_only_mod = false
+        KnownModIndex.savedata.known_mods[k].temp_disabled = false -- 使Chinese++ Pro能够正确判断其它客户端模组是否开启
     end
 
     -- 被添加至服务器的客户端MOD，如果有设置过就加载自己设置的选项，否则加载服务器提供的选项，否则加载默认选项
@@ -78,11 +159,32 @@ for k,_ in pairs(clientmods) do
             end
         end
     end
+
+    -- 兼容"友好的禁用客户端模组" (手动在此处加载被转换的客户端模组)
+    if TheNet:GetIsClient() then
+        if ServerAreClientModsDisabled then
+            DEBUG_print("[客户端MOD转为服务器MOD] 检测到服务器开启了“友好的禁用客户端模组”  开始进行额外处理")
+            registerclientmods(k)
+        end
+    end
 end
 
--- 修复gamepostinit不加载的问题
+if TheNet:GetIsClient() and ServerAreClientModsDisabled then
+    -- 修复Chinese++ Pro不加载的问题（修复代码总不能写Chinese++ Pro里吧，它都不加载了修个寂寞）
+    if server_listing and server_listing.mods_description then
+        for k,v in pairs (server_listing.mods_description) do
+            if server_listing.mods_description[k].modinfo_name == "Chinese++ Pro" or server_listing.mods_description[k].modinfo_name == "Chinese++ Pro - GitLab版" then
+                registerclientmods(server_listing.mods_description[k].mod_name)
+                break
+            end
+        end
+    end
+
+    kleiregistermods(need_kleiregistermods)
+end
+
 if TheNet:GetIsClient() then
-    DEBUG_print("[客户端MOD转为服务器MOD] HOOK KnownModIndex.IsModEnabled成功")
+    -- 修复gamepostinit不加载的问题
     local _ModIndex_IsModEnabled = KnownModIndex.IsModEnabled
     KnownModIndex.IsModEnabled = function(self, modname, ...)
         local mod_enabled = _ModIndex_IsModEnabled(self, modname, ...)

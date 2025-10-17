@@ -26,7 +26,7 @@ author = "冰冰羊"
 description = [[
 
 ]]
-version = "0.2.4"
+version = "0.3"
 dst_compatible = true
 forge_compatible = true
 gorge_compatible = true
@@ -60,6 +60,7 @@ configuration_options =
             {description = zh_en("关闭", "Off"), data = false},
         },
         default = false,
+        client = true,
     },
     {
         name = "language",

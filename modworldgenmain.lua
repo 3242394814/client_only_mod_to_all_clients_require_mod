@@ -27,8 +27,10 @@ else
     lang = "en"
 end
 
+local DEBUG_print = GetModConfigData("DEBUG_print", true) and print or function(...) end
+
 local function UpdateModSettings(mod_list)
-    print("更新数据......")
+    DEBUG_print("[客户端MOD转为服务器MOD] 更新数据......")
     local modconfig = KnownModIndex:LoadModConfigurationOptions(modname)
     for _,j in pairs (modconfig) do
         if j.name == "client_mods_list" then
@@ -54,11 +56,11 @@ local function fn(self)
 
     if (self.world_tabs[2] and self.world_tabs[2].isnewshard == true) then
         mod_list = {} -- 清空列表
-        print("[客户端MOD转为服务器MOD] 请成功生成洞穴世界后再使用此Mod，本MOD不兼容无洞穴存档\n[Convert client mod to server mod] Please successfully generate the cave world before using this Mod.")
+        DEBUG_print("[客户端MOD转为服务器MOD] 请成功生成洞穴世界后再使用此Mod，本MOD不兼容无洞穴存档\n[Convert client mod to server mod] Please successfully generate the cave world before using this Mod.")
         return
     end
 
-    print("[客户端MOD转为服务器MOD] 自动更新数据...")
+    DEBUG_print("[客户端MOD转为服务器MOD] 自动更新数据...")
     for k,_ in pairs(mod_list) do
         local known_mod = KnownModIndex.savedata.known_mods[k]
         if known_mod then
@@ -66,7 +68,7 @@ local function fn(self)
             version = TrimString(version or "")
             version = string.lower(version)
 
-            print("要转换为服务器的客户端MOD：", k, "版本号：", version)
+            DEBUG_print("[客户端MOD转为服务器MOD] 要转换为服务器的客户端MOD：", k, "版本号：", version)
             local temp_config = {}
             local mod_options = known_mod.modinfo and known_mod.modinfo.configuration_options or {}
             for k,v in pairs(mod_options) do
@@ -90,7 +92,7 @@ local function fn(self)
             if not tips_DSA then
                 tips_DSA = true
                 mod_list = {} -- 清空列表
-                print("[客户端MOD转为服务器MOD] 请关闭独行长路后再使用此Mod（一个人玩还开这个干嘛???）\n[Convert client mod to server mod] Please disable Don't Starve Alone before using this Mod")
+                DEBUG_print("[客户端MOD转为服务器MOD] 请关闭独行长路后再使用此Mod（一个人玩还开这个干嘛???）\n[Convert client mod to server mod] Please disable Don't Starve Alone before using this Mod")
             end
             return
         end
@@ -151,7 +153,7 @@ local function fn(self)
                         version = string.lower(version)
 
                         mod_list[k] = {
-                             version = version, -- "workshop-123456" = 版本号
+                             version = version,
                              config = temp_config
                         }
                     end
@@ -162,6 +164,9 @@ local function fn(self)
                 opt.add_to_server_mod:MoveToFront()
                 opt.add_to_server_mod.scale_on_focus = false
             end
+        elseif KnownModIndex.savedata.known_mods[opt.parent.data.mod.modname] and KnownModIndex.savedata.known_mods[opt.parent.data.mod.modname].modinfo.all_clients_require_mod then -- 如果模组有 all_clients_require_mod 字段
+            opt.add_to_server_mod:Hide() -- 隐藏按钮
+            mod_list[opt.parent.data.mod.modname] = nil
         elseif opt.add_to_server_mod and self.mods_tab.currentmodtype == "client" then -- 客户端模组页面
             opt.add_to_server_mod:Show() -- 显示按钮
         elseif opt.add_to_server_mod and self.mods_tab.currentmodtype == "server" then -- 服务器模组页面
