@@ -184,10 +184,16 @@ if TheNet:GetIsClient() and ServerAreClientModsDisabled then
 end
 
 if TheNet:GetIsClient() then
-    -- 修复gamepostinit不加载的问题
+    -- 修复部分行为不一致的问题
+
     local _ModIndex_IsModEnabled = KnownModIndex.IsModEnabled
     KnownModIndex.IsModEnabled = function(self, modname, ...)
         local mod_enabled = _ModIndex_IsModEnabled(self, modname, ...)
         return mod_enabled or clientmods[modname]
+    end
+
+    local _GetModConfigurationOptions_Internal = KnownModIndex.GetModConfigurationOptions_Internal
+    KnownModIndex.GetModConfigurationOptions_Internal = function(self, modname, force_local_options, ...)
+        return _GetModConfigurationOptions_Internal(self, modname, force_local_options or clientmods[modname], ...)
     end
 end
