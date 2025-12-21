@@ -1,24 +1,7 @@
 ---@diagnostic disable: lowercase-global
-local function zh_en(zh, en)  -- Other languages don't work
-    local chinese_languages =
-    {
-        zh = "zh", -- Chinese for Steam
-        zhr = "zh", -- Chinese for WeGame
-        ch = "zh", -- Chinese mod
-        chs = "zh", -- Chinese mod
-        sc = "zh", -- simple Chinese
-        zht = "zh", -- traditional Chinese for Steam
-        tc = "zh", -- traditional Chinese
-        cht = "zh", -- Chinese mod
-    }
-
-    if chinese_languages[locale] ~= nil then
-        lang = chinese_languages[locale]
-    else
-        lang = en
-    end
-
-    return lang ~= "zh" and en or zh
+local L = locale
+local function zh_en(zh, en)
+    return L ~= "zh" and L ~= "zhr" and L ~= "zht" and en or zh
 end
 
 name = zh_en("客户端Mod转为服务器Mod", "Convert client mod to server mod")
@@ -26,8 +9,7 @@ author = "冰冰羊"
 description = [[
 
 ]]
-version = "0.3.1"
-version_compatible = "0.3"
+version = "0.3.2"
 dst_compatible = true
 forge_compatible = true
 gorge_compatible = true
