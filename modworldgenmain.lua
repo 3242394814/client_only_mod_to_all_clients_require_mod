@@ -16,6 +16,7 @@ local chinese_languages =
     ch = "zh", -- Chinese mod
     chs = "zh", -- Chinese mod
     sc = "zh", -- simple Chinese
+    chinese = "zh", -- Chinese mod
     zht = "zh", -- traditional Chinese for Steam
 	tc = "zh", -- traditional Chinese
 	cht = "zh", -- Chinese mod
@@ -45,13 +46,7 @@ local mod_list = {}
 local function fn(self)
     local ImageButton = require "widgets/imagebutton"
     if ShardSaveGameIndex then
-        mod_list =  ShardSaveGameIndex.slot_cache and
-                    ShardSaveGameIndex.slot_cache[self.save_slot] and
-                    ShardSaveGameIndex.slot_cache[self.save_slot]["Master"] and
-                    ShardSaveGameIndex.slot_cache[self.save_slot]["Master"].enabled_mods and
-                    ShardSaveGameIndex.slot_cache[self.save_slot]["Master"].enabled_mods[modname] and
-                    ShardSaveGameIndex.slot_cache[self.save_slot]["Master"].enabled_mods[modname].configuration_options and
-                    ShardSaveGameIndex.slot_cache[self.save_slot]["Master"].enabled_mods[modname].configuration_options["client_mods_list"] or {}
+        mod_list = table.typecheckedgetfield(ShardSaveGameIndex.slot_cache, "table", self.save_slot, "Master", "enabled_mods", modname, "configuration_options", "client_mods_list") or {}
     end
 
     if (self.world_tabs[2] and self.world_tabs[2].isnewshard == true) then
