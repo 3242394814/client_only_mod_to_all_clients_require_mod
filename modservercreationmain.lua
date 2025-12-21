@@ -36,6 +36,7 @@ local function UpdateModSettings(mod_list)
     for _,j in pairs (modconfig) do
         if j.name == "client_mods_list" then
             j.saved = mod_list
+            break
         end
     end
 
@@ -47,12 +48,6 @@ local function fn(self)
     local ImageButton = require "widgets/imagebutton"
     if ShardSaveGameIndex then
         mod_list = table.typecheckedgetfield(ShardSaveGameIndex.slot_cache, "table", self.save_slot, "Master", "enabled_mods", modname, "configuration_options", "client_mods_list") or {}
-    end
-
-    if (self.world_tabs[2] and self.world_tabs[2].isnewshard == true) then
-        mod_list = {} -- 清空列表
-        DEBUG_print("[客户端MOD转为服务器MOD] 请成功生成洞穴世界后再使用此Mod，本MOD不兼容无洞穴存档\n[Convert client mod to server mod] Please successfully generate the cave world before using this Mod.")
-        return
     end
 
     DEBUG_print("[客户端MOD转为服务器MOD] 自动更新数据...")
@@ -73,7 +68,7 @@ local function fn(self)
             end
 
             mod_list[k] = {
-                    version = version, -- "workshop-123456" = 版本号
+                    version = version,
                     config = temp_config
             }
         end
@@ -83,14 +78,6 @@ local function fn(self)
     self.mods_tab.mods_scroll_list.update_fn = function(context, widget, data, index)
         _ApplyDataToWidget(context, widget, data, index)
         if data == nil then return end
-        if KnownModIndex:IsModEnabledAny("workshop-2657513551") then
-            if not tips_DSA then
-                tips_DSA = true
-                mod_list = {} -- 清空列表
-                DEBUG_print("[客户端MOD转为服务器MOD] 请关闭独行长路后再使用此Mod（一个人玩还开这个干嘛???）\n[Convert client mod to server mod] Please disable Don't Starve Alone before using this Mod")
-            end
-            return
-        end
 
         local opt = widget.moditem
         local function refresh()
@@ -124,7 +111,7 @@ local function fn(self)
                         version = string.lower(version)
 
                         mod_list[opt.parent.data.mod.modname] = {
-                             version = version, -- "workshop-123456" = 版本号
+                             version = version,
                              config = temp_config
                         }
                     end
