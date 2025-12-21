@@ -17,18 +17,18 @@ if not TheNet:IsDedicated() and not TheNet:GetIsClient() then
     return
 end
 
--- print("专服 = ",TheNet:IsDedicated())
--- print("服务器 = ",TheNet:GetIsServer())
--- print("客户端 = ",TheNet:GetIsClient())
+-- 检测环境
+-- print("专服 = ",TheNet:IsDedicated()) -- 专服始终为true，反之始终false
+-- print("服务器 = ",TheNet:GetIsServer()) -- 专服初始化时为false，然后为true。使用客户端开服始终为true （客户端开服指开了独行长路的世界/无洞穴世界）
+-- print("客户端 = ",TheNet:GetIsClient()) -- 客户端始终为true，反之始终false
 -- if true then return end
 
 local DEBUG_print = GetModConfigData("DEBUG_print", true) and print or function(...) end
 local clientmods = GetModConfigData("client_mods_list") or {}
 
--- 服务器：将转换的客户端模组添加到“服务器模组列表”中，这样客户端进服时就会自动下载那些客户端模组
-if TheNet:IsDedicated() then
+if TheNet:IsDedicated() then -- 服务器：将转换的客户端模组添加到“服务器模组列表”中，这样客户端进服时就会自动下载并启用那些客户端模组
     local OldGetEnabledServerModNames = ModManager.GetEnabledServerModNames
-    ModManager.GetEnabledServerModNames=function(self,...)
+    ModManager.GetEnabledServerModNames = function(self,...)
         local server_mods = OldGetEnabledServerModNames(self,...)
             if IsNotConsole() then
                 for k,v in pairs(clientmods) do
@@ -38,6 +38,12 @@ if TheNet:IsDedicated() then
                 end
             end
         return server_mods
+    end
+else -- 客户端，检查是否下载并正确开启了所需的客户端模组
+    for k in pairs(clientmods) do
+        if not (KnownModIndex:GetModInfo(k) and KnownModIndex:IsModTempEnabled(k)) then
+            return -- 缺斤少两！取消加载本模组！可能是服务器为独行长路/无洞穴世界，所以服务器没将模组添加到服务器模组列表，所以玩家不会临时启用那些客户端模组，所以这里检测不通过
+        end
     end
 end
 
@@ -126,8 +132,8 @@ local function registerclientmods(modname) -- 手动初始化客户端模组并�
 end
 
 -- 额外处理
-for k,_ in pairs(clientmods) do
-    if not KnownModIndex.savedata.known_mods[k] then
+for k in pairs(clientmods) do
+    if not KnownModIndex.savedata.known_mods[k] and TheNet:IsDedicated() then -- 只有专服才能使用方法一
         DEBUG_print("[客户端MOD转为服务器MOD] 使用方法一转换MOD类型", k)
         KnownModIndex.savedata.known_mods[k] = {}
         local known_mod = KnownModIndex.savedata.known_mods[k]
@@ -146,7 +152,7 @@ for k,_ in pairs(clientmods) do
     -- 被添加至服务器的客户端MOD，如果有设置过就加载自己设置的选项，否则加载服务器提供的选项，否则加载默认选项
     local known_mod = KnownModIndex.savedata.known_mods[k]
     if known_mod and known_mod.modinfo then
-        if not known_mod.modinfo.configuration_options then -- MOD未下载的情况（仅服务器可能会走这条分支，客户端未下载MOD就完全不生效了）
+        if not known_mod.modinfo.configuration_options then -- MOD未下载的情况（仅服务器可能会走这条分支）
             known_mod.modinfo.configuration_options = {}
             local mod_options = known_mod.modinfo.configuration_options
             for k1,v1 in pairs(clientmods[k].config) do
