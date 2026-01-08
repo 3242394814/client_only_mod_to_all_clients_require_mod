@@ -23,7 +23,7 @@ end
 -- print("客户端 = ",TheNet:GetIsClient()) -- 客户端始终为true，反之始终false
 -- if true then return end
 
-local DEBUG_print = GetModConfigData("DEBUG_print", true) and print or function(...) end
+local DEBUG_print = GetModConfigData("DEBUGPrint", true) and print or function(...) end
 local clientmods = GetModConfigData("client_mods_list") or {}
 
 if TheNet:IsDedicated() then -- 服务器：将转换的客户端模组添加到“服务器模组列表”中，这样客户端进服时就会自动下载并启用那些客户端模组
@@ -163,6 +163,7 @@ for k in pairs(clientmods) do
                 DEBUG_print("[客户端MOD转为服务器MOD] 正在使用方法一设置客户端模组设置", k, k1, "=", v1)
             end
         else -- MOD已下载的情况
+            KnownModIndex:LoadModConfigurationOptions(k) -- 加载保存的模组设置文件
             local mod_options = known_mod.modinfo.configuration_options
             for _, k1 in pairs(mod_options) do
                 for k2,v2 in pairs(clientmods[k].config) do
@@ -178,8 +179,8 @@ for k in pairs(clientmods) do
                 local temp_options = known_mod.temp_config_options
                 for _, k1 in pairs(mod_options) do
                     if type(k1) == "table" and k1.name then
-                        DEBUG_print("[客户端MOD转为服务器MOD] 正在修改临时模组设置", k, k1.name, "=", temp_options[k1.name])
                         temp_options[k1.name] = k1.saved or temp_options[k1.name] or k1.default -- 本地保存的设置/服务器设置/默认设置
+                        DEBUG_print("[客户端MOD转为服务器MOD] 正在修改临时模组设置", k, k1.name, "=", temp_options[k1.name])
                     else
                         DEBUG_print("[客户端MOD转为服务器MOD] 修改临时模组设置时出错，k = " .. tostring(k) , "type(k1) = " .. tostring(type(k1)), "值为" .. tostring(k1))
                     end

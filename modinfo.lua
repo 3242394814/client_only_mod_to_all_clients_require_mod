@@ -6,10 +6,9 @@ end
 
 name = zh_en("客户端Mod转为服务器Mod", "Convert client mod to server mod")
 author = "冰冰羊"
-description = [[
-
-]]
-version = "0.3.2"
+description = [[]]
+version = "0.3.3"
+version_compatible = "0.3.2"
 dst_compatible = true
 forge_compatible = true
 gorge_compatible = true
@@ -35,14 +34,14 @@ configuration_options =
         default = {},
     },
     {
-        name = "DEBUG_print",
+        name = "DEBUGPrint",
         label = zh_en("打印调试信息", "Print Debug Info"),
         hover = zh_en("在客户端日志中打印调试信息", "Print debug information in client log(But they are in Chinese)"),
         options = {
             {description = zh_en("开启", "On"), data = true},
             {description = zh_en("关闭", "Off"), data = false},
         },
-        default = false,
+        default = true,
         client = true,
     },
     {
