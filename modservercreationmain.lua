@@ -28,7 +28,7 @@ else
     lang = "en"
 end
 
-local DEBUG_print = GetModConfigData("DEBUG_print", true) and print or function(...) end
+local DEBUG_print = GetModConfigData("DEBUGPrint", true) and print or function(...) end
 
 local function UpdateModSettings(mod_list)
     DEBUG_print("[客户端MOD转为服务器MOD] 更新数据......")
@@ -71,6 +71,8 @@ local function fn(self)
                     version = version,
                     config = temp_config
             }
+        else
+            mod_list[k] = nil
         end
     end
 
@@ -98,46 +100,50 @@ local function fn(self)
                         mod_list[opt.parent.data.mod.modname] = nil
                     else
                         local known_mod = KnownModIndex.savedata.known_mods[opt.parent.data.mod.modname]
-                        local temp_config = {}
-                        local mod_options = known_mod.modinfo.configuration_options or {}
-                        for k,v in pairs(mod_options) do
-                            if type(v) == "table" then
-                                temp_config[v.name] = mod_options[k].saved or v.default
+                        if known_mod then
+                            local temp_config = {}
+                            local mod_options = known_mod.modinfo.configuration_options or {}
+                            for k,v in pairs(mod_options) do
+                                if type(v) == "table" then
+                                    temp_config[v.name] = mod_options[k].saved or v.default
+                                end
                             end
+
+                            local version = KnownModIndex:InitializeModInfo(opt.parent.data.mod.modname).version
+                            version = TrimString(version or "")
+                            version = string.lower(version)
+
+                            mod_list[opt.parent.data.mod.modname] = {
+                                version = version,
+                                config = temp_config
+                            }
                         end
-
-                        local version = KnownModIndex:InitializeModInfo(opt.parent.data.mod.modname).version
-                        version = TrimString(version or "")
-                        version = string.lower(version)
-
-                        mod_list[opt.parent.data.mod.modname] = {
-                             version = version,
-                             config = temp_config
-                        }
                     end
                     refresh() -- 切换开关状态也需要刷新
                 end)
 
                 local oldCreate = self.Create
                 self.Create = function(self, warnedOffline, warnedDisabledMods, warnedOutOfDateMods, ...)
-                    for k,v in pairs(mod_list) do
+                    for k in pairs(mod_list) do
                         local known_mod = KnownModIndex.savedata.known_mods[k]
-                        local temp_config = {}
-                        local mod_options = known_mod.modinfo.configuration_options or {}
-                        for k1,v1 in pairs(mod_options) do
-                            if type(v1) == "table" then
-                                temp_config[v1.name] = mod_options[k1].saved or v1.default
+                        if known_mod then
+                            local temp_config = {}
+                            local mod_options = known_mod.modinfo.configuration_options or {}
+                            for k1,v1 in pairs(mod_options) do
+                                if type(v1) == "table" then
+                                    temp_config[v1.name] = mod_options[k1].saved or v1.default
+                                end
                             end
+
+                            local version = KnownModIndex:InitializeModInfo(k).version
+                            version = TrimString(version or "")
+                            version = string.lower(version)
+
+                            mod_list[k] = {
+                                version = version,
+                                config = temp_config
+                            }
                         end
-
-                        local version = KnownModIndex:InitializeModInfo(k).version
-                        version = TrimString(version or "")
-                        version = string.lower(version)
-
-                        mod_list[k] = {
-                             version = version,
-                             config = temp_config
-                        }
                     end
                     UpdateModSettings(mod_list)
                     oldCreate(self, warnedOffline, warnedDisabledMods, warnedOutOfDateMods, ...)

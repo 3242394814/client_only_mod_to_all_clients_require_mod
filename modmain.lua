@@ -25,6 +25,8 @@ end
 
 local DEBUG_print = GetModConfigData("DEBUGPrint", true) and print or function(...) end
 local clientmods = GetModConfigData("client_mods_list") or {}
+local ServerAreClientModsDisabled = false -- 服务器是否开启“友好的禁用客户端模组”
+local Chinese_Pro_MODID
 
 if TheNet:IsDedicated() then -- 服务器：将转换的客户端模组添加到“服务器模组列表”中，这样客户端进服时就会自动下载并启用那些客户端模组
     local OldGetEnabledServerModNames = ModManager.GetEnabledServerModNames
@@ -39,7 +41,33 @@ if TheNet:IsDedicated() then -- 服务器：将转换的客户端模组添加到
             end
         return server_mods
     end
-else -- 客户端，检查是否下载并正确开启了所需的客户端模组
+else -- 客户端
+
+    -- 检测服务器是否开启“友好的禁用客户端模组”
+    local server_listing = TheNet:GetServerListing()
+    if server_listing and server_listing.client_mods_disabled then
+        ServerAreClientModsDisabled = true
+    end
+
+    -- 修复Chinese++ Pro不加载的问题（修复代码总不能写Chinese++ Pro里吧，它都不加载了修个寂寞）
+    if server_listing and server_listing.mods_description then
+        for k,v in pairs (server_listing.mods_description) do
+            if server_listing.mods_description[k].modinfo_name == "Chinese++ Pro" or server_listing.mods_description[k].modinfo_name == "Chinese++ Pro - GitLab版" then
+                Chinese_Pro_MODID = server_listing.mods_description[k].mod_name
+                break
+            end
+        end
+    end
+
+    -- 开启【禁本地模组】时将Chinese++ Pro转换为纯服务器模组
+    if KnownModIndex:IsModEnabledAny("workshop-2860210553") and KnownModIndex:IsModEnabledAny(Chinese_Pro_MODID) then
+        clientmods[Chinese_Pro_MODID] = {
+            version = KnownModIndex.savedata.known_mods[Chinese_Pro_MODID] and KnownModIndex.savedata.known_mods[Chinese_Pro_MODID].modinfo.version or "", -- 这个重要吗？似乎不重要，因为这只影响进服... 这个比较特殊，是在进服后 客户端自己搞的
+            config = {} -- 不设置，遵循客户端自己的想法
+        }
+    end
+
+    -- 检查是否下载并正确开启了所需的客户端模组
     for k in pairs(clientmods) do
         if not (KnownModIndex:GetModInfo(k) and KnownModIndex:IsModTempEnabled(k)) then
             return -- 缺斤少两！取消加载本模组！可能是服务器为独行长路/无洞穴世界，所以服务器没将模组添加到服务器模组列表，所以玩家不会临时启用那些客户端模组，所以这里检测不通过
@@ -47,14 +75,7 @@ else -- 客户端，检查是否下载并正确开启了所需的客户端模组
     end
 end
 
-local ServerAreClientModsDisabled = false -- 服务器是否开启“友好的禁用客户端模组”
 local need_kleiregistermods = {} -- 需要注册的客户端模组
-
--- 检测服务器是否开启“友好的禁用客户端模组”
-local server_listing = TheNet:GetServerListing()
-if server_listing and server_listing.client_mods_disabled then
-    ServerAreClientModsDisabled = true
-end
 
 -- Sort the mods by priority, so that "library" mods can load first
 local function sanitizepriority(priority)
@@ -98,7 +119,7 @@ local function insert_sorted(tbl, value)
     table.insert(tbl, value)
 end
 
-local function registerclientmods(modname) -- 手动初始化客户端模组并添加到模组加载列表中
+local function Loadingclientmods(modname) -- 手动初始化客户端模组并添加到模组加载列表中
     if not table.contains(ModManager.modnames, modname) and ModManager.worldgen == false or (ModManager.worldgen == true and KnownModIndex:IsModCompatibleWithMode(modname)) then
         DEBUG_print("[客户端MOD转为服务器MOD] 加载客户端模组：", modname)
         table.insert(ModManager.modnames, modname)
@@ -155,7 +176,7 @@ for k in pairs(clientmods) do
         if not known_mod.modinfo.configuration_options then -- MOD未下载的情况（仅服务器可能会走这条分支）
             known_mod.modinfo.configuration_options = {}
             local mod_options = known_mod.modinfo.configuration_options
-            for k1,v1 in pairs(clientmods[k].config) do
+            for k1,v1 in pairs(clientmods[k].config or {}) do
                 table.insert(mod_options,{
                     name = k1,
                     saved = v1 -- 未下载对应客户端Mod的情况下，仅使用来自本Mod设置的配置
@@ -166,7 +187,7 @@ for k in pairs(clientmods) do
             KnownModIndex:LoadModConfigurationOptions(k) -- 加载保存的模组设置文件
             local mod_options = known_mod.modinfo.configuration_options
             for _, k1 in pairs(mod_options) do
-                for k2,v2 in pairs(clientmods[k].config) do
+                for k2,v2 in pairs(clientmods[k].config or {}) do
                     if k1.name == k2 then
                         k1.saved = k1.saved or v2 or k1.default -- 本地保存的设置/服务器设置/默认设置
                         DEBUG_print("[客户端MOD转为服务器MOD] 正在使用方法二设置客户端模组设置", k, k1.name, "=", k1.saved)
@@ -193,20 +214,14 @@ for k in pairs(clientmods) do
     if TheNet:GetIsClient() then
         if ServerAreClientModsDisabled then
             DEBUG_print("[客户端MOD转为服务器MOD] 检测到服务器开启了“友好的禁用客户端模组”  开始进行额外处理")
-            registerclientmods(k)
+            Loadingclientmods(k)
         end
     end
 end
 
 if TheNet:GetIsClient() and ServerAreClientModsDisabled then
-    -- 修复Chinese++ Pro不加载的问题（修复代码总不能写Chinese++ Pro里吧，它都不加载了修个寂寞）
-    if server_listing and server_listing.mods_description then
-        for k,v in pairs (server_listing.mods_description) do
-            if server_listing.mods_description[k].modinfo_name == "Chinese++ Pro" or server_listing.mods_description[k].modinfo_name == "Chinese++ Pro - GitLab版" then
-                registerclientmods(server_listing.mods_description[k].mod_name)
-                break
-            end
-        end
+    if Chinese_Pro_MODID then
+        Loadingclientmods(Chinese_Pro_MODID)
     end
 
     kleiregistermods(need_kleiregistermods) -- 使用科雷的C层函数注册模组
